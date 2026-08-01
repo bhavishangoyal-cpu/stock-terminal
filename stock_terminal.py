@@ -1579,11 +1579,11 @@ def run_single_stock():
     with tabs[12]:
         ann_s = ann.sort_index(axis=1,ascending=False)
         st.subheader("Annual")
-        st.dataframe(ann_s.iloc[:, :4].applymap(lambda x: round(x/1e9,3) if isinstance(x,(int,float)) and not pd.isna(x) and abs(x)>1e6 else x),
+        st.dataframe(ann_s.iloc[:, :4].map(lambda x: round(x/1e9,3) if isinstance(x,(int,float)) and not pd.isna(x) and abs(x)>1e6 else x),
                      use_container_width=True)
         qtr_s = qtr.sort_index(axis=1,ascending=False)
         st.subheader("Quarterly")
-        st.dataframe(qtr_s.iloc[:,:6].applymap(lambda x: round(x/1e9,3) if isinstance(x,(int,float)) and not pd.isna(x) and abs(x)>1e6 else x),
+        st.dataframe(qtr_s.iloc[:,:6].map(lambda x: round(x/1e9,3) if isinstance(x,(int,float)) and not pd.isna(x) and abs(x)>1e6 else x),
                      use_container_width=True)
         st.caption("Values in $B where applicable")
 
