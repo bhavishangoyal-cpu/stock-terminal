@@ -6,3 +6,17 @@ pandas-ta
 streamlit-autorefresh
 google-genai
 requests
+streamlit
+yfinance
+streamlit
+yfinance
+pandas
+plotly
+streamlit-autorefresh
+google-genai
+plotly
+streamlit
+pandas
+numpy
+yfinance
+
