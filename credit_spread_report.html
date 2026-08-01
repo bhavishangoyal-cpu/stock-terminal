@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Credit Spread Screener</title>
+<style>
+  body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#0f1115; color:#e8e8ea; margin:0; padding:40px; }
+  h1 { font-size:26px; margin-bottom:4px; }
+  .subtitle { color:#8a8f98; margin-bottom:6px; }
+  .warning { background:#2a1f0f; border:1px solid #6b4f1a; color:#e0b866; padding:14px 18px; border-radius:10px; margin:20px 0 30px; font-size:14px; line-height:1.5; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap:20px; }
+  .card { background:#1a1d24; border:1px solid #2a2e37; border-radius:14px; padding:20px; position:relative; }
+  .card-header { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .ticker { font-size:20px; font-weight:700; }
+  .rank { background:#3a2f14; color:#e0b866; font-size:11px; font-weight:700; padding:3px 8px; border-radius:12px; }
+  .lean { font-size:12px; font-weight:700; padding:4px 10px; border-radius:20px; }
+  .lean.bullish { background:#14351f; color:#4ade80; }
+  .lean.bearish { background:#3a1414; color:#f87171; }
+  .side { font-size:12px; color:#8a8f98; margin-left:auto; }
+  .quality-row { display:flex; justify-content:space-between; align-items:center; background:#12141a; border:1px solid #262a33; border-radius:8px; padding:8px 12px; margin-bottom:16px; }
+  .quality-label { font-size:11px; color:#8a8f98; }
+  .quality-score { font-size:15px; font-weight:700; }
+  .quality-score.high { color:#4ade80; }
+  .quality-score.mid { color:#e0b866; }
+  .quality-score.low { color:#f87171; }
+  .card-body { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+  .stat { display:flex; flex-direction:column; }
+  .label { font-size:11px; color:#8a8f98; text-transform:uppercase; letter-spacing:0.5px; }
+  .value { font-size:16px; font-weight:600; margin-top:2px; }
+  .value.credit { color:#4ade80; }
+  .value.loss { color:#f87171; }
+  .flag-row { margin-top:14px; }
+  .flag { display:inline-block; background:#2a1f0f; color:#e0b866; font-size:12px; padding:8px 12px; border-radius:8px; }
+  footer { margin-top:40px; color:#5a5f68; font-size:12px; line-height:1.6; }
+</style></head>
+<body>
+  <h1>Credit Spread Screener</h1>
+  <div class="subtitle">July 19, 2026 — 09:02 PM — 3 candidates · Target: 20-delta (~80% theoretical probability), $70-$80 credit · Sorted by reference score</div>
+  <div class="warning">
+    <strong>Read before acting:</strong> These strikes/credits are priced off today's live data — this is a real, current read, not stale. But the theoretical 80% probability assumes holding to expiration; our own backtesting on a 1-day hold showed real win rates closer to 55–65%. The directional lean is a statistical tilt from trend/momentum factors, not a forecast. <strong>The Reference Score is a manually-weighted combination of RSI alignment, return on risk, and options skew — it has NOT been backtested as a combined ranking.</strong> Use it to organize the list, not as proof one trade is better than another.
+  </div>
+  <div class="grid">
+    
+        <div class="card">
+          <div class="card-header">
+            <span class="ticker">ISRG</span><span class="rank">#1</span>
+            <span class="lean bearish">BEARISH</span>
+            <span class="side">BEAR CALL</span>
+          </div>
+          <div class="quality-row">
+            <span class="quality-label">Reference Score (unvalidated)</span>
+            <span class="quality-score high">60.8/100</span>
+          </div>
+          <div class="card-body">
+            <div class="stat"><span class="label">Spot</span><span class="value">$345.42</span></div>
+            <div class="stat"><span class="label">Short Strike</span><span class="value">$378.94</span></div>
+            <div class="stat"><span class="label">Long Strike</span><span class="value">$383.94</span></div>
+            <div class="stat"><span class="label">Credit</span><span class="value credit">$78</span></div>
+            <div class="stat"><span class="label">Max Loss</span><span class="value loss">$422</span></div>
+            <div class="stat"><span class="label">Return on Risk</span><span class="value">18.6%</span></div>
+            <div class="stat"><span class="label">RSI</span><span class="value">33.4</span></div>
+            <div class="stat"><span class="label">Next Earnings</span><span class="value">N/A</span></div>
+          </div>
+          
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="ticker">INTU</span>
+            <span class="lean bearish">BEARISH</span>
+            <span class="side">BEAR CALL</span>
+          </div>
+          <div class="quality-row">
+            <span class="quality-label">Reference Score (unvalidated)</span>
+            <span class="quality-score mid">47.1/100</span>
+          </div>
+          <div class="card-body">
+            <div class="stat"><span class="label">Spot</span><span class="value">$291.09</span></div>
+            <div class="stat"><span class="label">Short Strike</span><span class="value">$310.30</span></div>
+            <div class="stat"><span class="label">Long Strike</span><span class="value">$315.30</span></div>
+            <div class="stat"><span class="label">Credit</span><span class="value credit">$77</span></div>
+            <div class="stat"><span class="label">Max Loss</span><span class="value loss">$423</span></div>
+            <div class="stat"><span class="label">Return on Risk</span><span class="value">18.1%</span></div>
+            <div class="stat"><span class="label">RSI</span><span class="value">63.7</span></div>
+            <div class="stat"><span class="label">Next Earnings</span><span class="value">2026-08-20</span></div>
+          </div>
+          
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="ticker">SNPS</span>
+            <span class="lean bearish">BEARISH</span>
+            <span class="side">BEAR CALL</span>
+          </div>
+          <div class="quality-row">
+            <span class="quality-label">Reference Score (unvalidated)</span>
+            <span class="quality-score low">20.5/100</span>
+          </div>
+          <div class="card-body">
+            <div class="stat"><span class="label">Spot</span><span class="value">$384.28</span></div>
+            <div class="stat"><span class="label">Short Strike</span><span class="value">$404.36</span></div>
+            <div class="stat"><span class="label">Long Strike</span><span class="value">$409.36</span></div>
+            <div class="stat"><span class="label">Credit</span><span class="value credit">$79</span></div>
+            <div class="stat"><span class="label">Max Loss</span><span class="value loss">$421</span></div>
+            <div class="stat"><span class="label">Return on Risk</span><span class="value">18.7%</span></div>
+            <div class="stat"><span class="label">RSI</span><span class="value">20.6</span></div>
+            <div class="stat"><span class="label">Next Earnings</span><span class="value">2026-09-08</span></div>
+          </div>
+          <div class="flag-row"><span class="flag">⚠ Oversold (RSI &lt; 30) — conflicts with bearish lean</span></div>
+        </div>
+  </div>
+  <footer>Generated by credit_spread_screener_all_in_one.py</footer>
+</body></html>

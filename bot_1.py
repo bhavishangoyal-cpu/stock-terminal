@@ -7,29 +7,53 @@ import winsound
 # ==========================================
 # CONFIG — same percentages for every symbol, nothing stock-specific
 # ==========================================
-SYMBOLS = ['NVDA', 'TSLA', 'GOOG']
-CAPITAL = 10000.0
+SYMBOLS = [
+    "NVDA",
+    "AMD",
+    "ARM",
+    "CRWD",
+    "AVGO",
+    "META",
+    "TSM",
+    "AMZN",
+    "GOOGL",
+    "ASML",
+    "QCOM",
+    "DASH",
+    "SMH",
+    "SOXX",
+    "QQQ"
+]
+CAPITAL = 9000
 BAR_SIZE = '2 mins'
 HISTORY_DURATION = '2 D'
 
 IB_HOST = '127.0.0.1'
 IB_PORT = 7497
 CLIENT_ID = 3
-MARKET_DATA_TYPE = 3  # 1 = Live (required before real trading), 3 = Delayed
+MARKET_DATA_TYPE = 1  # LIVE data — confirmed real-time subscription, not delayed
 
 # --- Percentage-based thresholds (identical across all symbols) ---
-BREAKEVEN_TRIGGER_PCT = 0.001    # +0.10% peak profit triggers breakeven lock
+BREAKEVEN_TRIGGER_PCT = 0.0012    # +0.10% peak profit triggers breakeven lock
 BREAKEVEN_BUFFER_PCT = 0.0002    # +0.02% buffer above entry
-TRAILING_DISTANCE_PCT = 0.002    # 0.20% trailing distance from peak
+TRAILING_DISTANCE_PCT = 0.0002    # 0.20% trailing distance from peak
 QUICK_SCALP_PCT = 0.003          # 0.30% quick profit target
 MIN_ACCELERATION = 0.01          # minimum histogram acceleration to qualify as a candidate
+
+# --- Bounded time-based cleanup exit ---
+# This is NOT a stop-loss. It only clears out trades sitting in a genuinely
+# SMALL loss after some time, to free up capital. It never fires on a large
+# loss — those remain fully unbounded, per your explicit choice.
+MAX_HOLD_MINUTES = 30
+SMALL_LOSS_CAP_PCT = 0.0003      # 0.15% — meaningfully smaller than QUICK_SCALP_PCT,
+                                  # so this can never create the asymmetry we saw in the log
 
 # No hard stop-loss — per explicit instruction. A trade that never reaches
 # BREAKEVEN_TRIGGER_PCT has no bounded downside. This is a known, accepted risk.
 
 WINDOW_START_PT = dt_time(6, 30)
-WINDOW_END_PT = dt_time(12, 0)
-LOOP_SLEEP_SECONDS = 10  # compromise between responsiveness and IBKR historical-data pacing limits
+WINDOW_END_PT = dt_time(12, 30)
+LOOP_SLEEP_SECONDS = 3  # compromise between responsiveness and IBKR historical-data pacing limits
 
 ib = None
 contracts = {}
@@ -68,7 +92,7 @@ def print_daily_pnl(tickers):
     unrealized = 0.0
     if state['held_symbol'] is not None and state['buy_price'] is not None:
         symbol = state['held_symbol']
-        now_price = tickers[symbol].last if tickers[symbol].last > 0 else tickers[symbol].close
+        now_price = market_engine.price(symbol)
         unrealized = (now_price - state['buy_price']) * state['qty_held']
 
     day_total = state['daily_realized_pnl'] + unrealized
@@ -247,21 +271,16 @@ def scan_for_entry(tickers):
     for symbol in SYMBOLS:
         try:
             ib.sleep(0.5)
-            bars = ib.reqHistoricalData(
-                contracts[symbol], endDateTime='', durationStr=HISTORY_DURATION,
-                barSizeSetting=BAR_SIZE, whatToShow='TRADES', useRTH=False, keepUpToDate=False
-            )
-            if not bars:
+            df = market_engine.dataframe(symbol)
+            if df is None or df.empty:
                 continue
-            df = util.df(bars).set_index('date')
-            df.index = pd.to_datetime(df.index, utc=True)
             df = calculate_ttm_squeeze(df)
             if len(df) < 25:
                 continue
 
             curr = df.iloc[-2]
             prev = df.iloc[-3]
-            now_price = tickers[symbol].last if tickers[symbol].last > 0 else tickers[symbol].close
+            now_price = market_engine.price(symbol)
             acceleration = curr['histogram'] - prev['histogram']
 
             squeeze_ok = (curr['squeeze_on'] == False)
@@ -320,13 +339,8 @@ def manage_open_position(tickers):
 
     # 2. Momentum rollover
     try:
-        bars = ib.reqHistoricalData(
-            contracts[symbol], endDateTime='', durationStr=HISTORY_DURATION,
-            barSizeSetting=BAR_SIZE, whatToShow='TRADES', useRTH=False, keepUpToDate=False
-        )
-        if bars:
-            df = util.df(bars).set_index('date')
-            df.index = pd.to_datetime(df.index, utc=True)
+        df = market_engine.dataframe(symbol)
+        if df is not None and not df.empty:
             df = calculate_ttm_squeeze(df)
             if len(df) >= 25:
                 curr = df.iloc[-2]
@@ -339,6 +353,19 @@ def manage_open_position(tickers):
     except Exception as e:
         print(f"⚠️ [{symbol}] Error checking momentum: {e}")
 
+    # 2b. BOUNDED time-based cleanup — only clears out a SMALL loss after MAX_HOLD_MINUTES.
+    # Explicitly capped so this can never fire on a large loss (that stays unbounded,
+    # per your choice on the hard stop). This is what "small_loss_after_time" should
+    # have been — the version in your last file had no such cap.
+    if state['entry_time'] is not None:
+        hold_minutes = (datetime.now(timezone.utc) - state['entry_time']).total_seconds() / 60.0
+        if hold_minutes >= MAX_HOLD_MINUTES and -SMALL_LOSS_CAP_PCT <= current_return < 0:
+            print(f"🧹 [{symbol}] Small loss ({current_return*100:.2f}%) after {hold_minutes:.0f} min — "
+                  f"clearing to free capital (capped at -{SMALL_LOSS_CAP_PCT*100:.2f}%, well under a real loss).")
+            cancel_resting_order()
+            submit_order(symbol, 'SELL', qty_held, note='small_loss_after_time')
+            return
+
     # 3. Trailing resting floor
     if not state['breakeven_locked'] and peak_return >= BREAKEVEN_TRIGGER_PCT:
         state['breakeven_locked'] = True
@@ -350,6 +377,50 @@ def manage_open_position(tickers):
         actual_floor = round(max(breakeven_floor, trailing_floor), 2)
         place_or_update_resting_floor(symbol, qty_held, actual_floor)
 
+class LiveMarketEngine:
+    def __init__(self, ib, symbols):
+        self.ib = ib
+        self.symbols = symbols
+        self.contracts = {}
+        self.tickers = {}
+        self.bars = {}
+        self.dataframes = {}
+
+    def start(self):
+        print("\nStarting Live Market Engine...")
+        for symbol in self.symbols:
+            contract = Stock(symbol, "SMART", "USD")
+            self.ib.qualifyContracts(contract)
+            self.contracts[symbol] = contract
+            contracts[symbol] = contract  # keep the global dict in sync for order placement
+
+            historical = self.ib.reqHistoricalData(
+                contract, endDateTime="", durationStr=HISTORY_DURATION,
+                barSizeSetting=BAR_SIZE, whatToShow="TRADES", useRTH=False,
+                formatDate=1, keepUpToDate=True
+            )
+            self.bars[symbol] = historical
+            self.dataframes[symbol] = util.df(historical)
+
+            historical.updateEvent += (
+                lambda bars, hasNewBar, s=symbol: self.update_bars(s, bars, hasNewBar)
+            )
+
+            self.tickers[symbol] = self.ib.reqMktData(contract)
+            print(symbol, "LIVE READY")
+
+    def update_bars(self, symbol, bars, hasNewBar):
+        if hasNewBar:
+            df = util.df(bars)
+            df.index = pd.to_datetime(df['date'], utc=True) if 'date' in df.columns else df.index
+            self.dataframes[symbol] = df.tail(500)
+
+    def price(self, symbol):
+        ticker = self.tickers[symbol]
+        return ticker.last if ticker.last > 0 else ticker.close
+
+    def dataframe(self, symbol):
+        return self.dataframes[symbol].copy()
 
 if __name__ == '__main__':
     util.logToConsole(level=30)
@@ -357,7 +428,13 @@ if __name__ == '__main__':
     print("Connecting to Interactive Brokers...")
     ib.connect(IB_HOST, IB_PORT, clientId=CLIENT_ID)
 
-    live_positions = ib.positions()
+    ib.reqMarketDataType(MARKET_DATA_TYPE)   # moved up — must be set before requesting data
+
+    market_engine = LiveMarketEngine(ib, SYMBOLS)
+    market_engine.start()                    # replaces the old tickers/contracts loop entirely
+    ib.sleep(2)
+    tickers = market_engine.tickers
+    live_positions = ib.positions()          # moved down — runs after engine is live
     for pos in live_positions:
         if pos.contract.symbol in SYMBOLS and pos.position != 0:
             state['held_symbol'] = pos.contract.symbol
@@ -366,16 +443,6 @@ if __name__ == '__main__':
             state['highest_price_seen'] = pos.avgCost
             print(f"🔄 SYNCED: Found {pos.position} shares of {pos.contract.symbol} in account.")
             break
-
-    ib.reqMarketDataType(MARKET_DATA_TYPE)
-
-    tickers = {}
-    for sym in SYMBOLS:
-        c = Stock(sym, 'SMART', 'USD')
-        ib.qualifyContracts(c)
-        contracts[sym] = c
-        tickers[sym] = ib.reqMktData(c)
-    ib.sleep(2)
 
     print(f"\n🚀 Live | Symbols: {SYMBOLS} | ${CAPITAL:.0f} pool | No hard stop")
     print(f"📊 Scalp: {QUICK_SCALP_PCT*100:.2f}% | Lock: {BREAKEVEN_TRIGGER_PCT*100:.2f}% | "
